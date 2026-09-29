@@ -1,0 +1,8 @@
+# Só o browser. O resto do projeto é stdlib (sqlite3, http.server, fcntl, zoneinfo).
+playwright==1.63.0
+
+# Depois de instalar, baixe o navegador:
+#   playwright install firefox
+# O projeto usa Firefox com perfil persistente (browser/perfil-ff), porque os
+# portais de vaga recarregam o contexto a cada navegação e o perfil salvo evita
+# recomeçar a sessão do zero a cada rodada.

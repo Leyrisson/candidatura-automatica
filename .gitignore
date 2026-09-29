@@ -1,0 +1,27 @@
+# Banco e estado de execução — NUNCA versionar (têm dados reais de candidatura)
+*.db
+*.db-wal
+*.db-shm
+*.jsonl
+estado.json
+historico-candidaturas.json
+coleta-vistos.json
+coleta-classificadas.json
+*.log
+
+# Perfil do navegador: cookies e sessão dos portais. NUNCA versionar.
+browser/perfil-ff/
+browser/perfil-chrome/
+browser/downloads/
+browser/perfil.lock
+browser/.venv/
+.venv/
+venv/
+
+# python
+__pycache__/
+*.py[cod]
+
+# node
+node_modules/
+package-lock.json

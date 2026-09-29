@@ -1,0 +1,15 @@
+{
+  "name": "candidatura-automatica",
+  "version": "1.0.0",
+  "description": "Coleta de vagas nos portais, classifica por critérios e filtra no SQLite",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "test": "node test-coleta-criterios.js",
+    "estado": "node estado.js"
+  },
+  "dependencies": {}
+}
