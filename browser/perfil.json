@@ -10,6 +10,6 @@
     { "match": ["experiência em suporte", "experiência em ti", "conhecimento em informática"], "resposta": "Sim" },
     { "match": ["windows 10", "windows 11", "windows 10/11", "sistema operacional windows"], "resposta": "Sim" },
     { "match": ["formatação", "manutenção e upgrade de computadores", "upgrade de computadores", "manutenção de computadores"], "resposta": "Sim" },
-    { "match": ["remuneração atual", "salário atual", "salario atual", "remuneração atual ou última"], "resposta": "R$ 7.000,00" }
+    { "match": ["remuneração atual", "salário atual", "salario atual", "remuneração atual ou última"], "resposta": "R$ 0.000,00" }
   ]
 }

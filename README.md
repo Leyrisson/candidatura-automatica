@@ -72,7 +72,7 @@ A ordem importa, e o motivo está em cada arquivo:
 |---|---|
 | `browser/coleta.py` | raspa os cards das páginas de busca (InfoJobs) |
 | `browser/sidecar.py` | abre a vaga, decide e preenche o formulário |
-| `browser/perfil.json` | respostas do formulário por palavra-chave |
+| `browser/perfil.json` | respostas do formulário por palavra-chave — **edite antes de usar** |
 | `browser/alternar.py` | botão liga/desliga (escreve `estado.json`) |
 | `browser/lock_perfil.py` | `flock` no perfil — duas coletas não brigam pelo Firefox |
 | `classifica.js` | heurística + LLM local |
@@ -112,6 +112,9 @@ direta, que é o fluxo atual, é autocontida.
 | `VAGAS_HEADLESS` | `1` | browser sem janela |
 
 ## ⚠️ Aviso
+
+`browser/perfil.json` é um **modelo**, com valores fictícios. Preencha com os
+seus antes de rodar — ele é o que o sidecar digita nos formulários.
 
 Automatizar candidacyatura em portal é contra os termos de uso de vários deles.
 Use no seu ritmo, com conta própria, e em volume humano.

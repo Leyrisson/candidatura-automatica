@@ -17,7 +17,7 @@ const SISTEMA = "/no_think\n"
 // Digest sintético no formato real que chega do InfoJobs (muito texto morto
 // antes da vaga), para o prefill ser comparável ao de produção.
 function digest(cargo, empresa, cidade, extra) {
-  const lixo = "Rhf Talentos (4.53 estrelas) Têm Novas Vagas Para Você. Nome do Candidato, Empresas destacadas "
+  const lixo = "Rhf Talentos (4.53 estrelas) Têm Novas Vagas Para Você. Nome do candidato, Empresas destacadas "
     + "acabam de publicar vagas interessantes para você. Ver novas vagas no portal, candidate-se pelo "
     + "site oficial, benefits,seal. ".repeat(60);
   return lixo + ` Vaga: ${cargo}. Empresa: ${empresa}. Local: ${cidade}. ${extra} `
