@@ -7,6 +7,7 @@ estado.json
 historico-candidaturas.json
 coleta-vistos.json
 coleta-classificadas.json
+telegram-enviado.json
 *.log
 
 # Perfil do navegador: cookies e sessão dos portais. NUNCA versionar.
