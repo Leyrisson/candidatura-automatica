@@ -110,6 +110,10 @@ def main():
                    help="forca ir tambem para o perfil.json")
     g.add_argument("--so-nesta-vaga", action="store_true",
                    help="forca ficar preso nesta vaga")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="so classifica e rela, sem gravar nada — e o que o "
+                         "telebot usa para mostrar a previa no resumo, antes "
+                         "do botao de confirmar")
     a = ap.parse_args()
 
     url = a.url.split("?")[0]
@@ -123,8 +127,9 @@ def main():
     store = le_json(STORE, {})
     vaga = store.setdefault(url, {})
     antes = vaga.get(chave)
-    vaga[chave] = resp
-    grava(STORE, store)
+    if not a.dry_run:
+        vaga[chave] = resp
+        grava(STORE, store)
 
     # 2) Promocao: decide se entra tambem no perfil.json
     if a.so_nesta_vaga:
@@ -136,23 +141,30 @@ def main():
 
     promovido = False
     if promovel:
-        perfil = le_json(PERFIL, {})
-        regras = perfil.setdefault("respostas_por_palavra", [])
         termo = termo_de_casamento(chave)
         if not termo:
             promovel, motivo = False, "pergunta so com numeros, sem termo fixo"
-        elif any(termo in sem_acento(" ".join(r.get("match", [])))
-                 for r in regras):
-            motivo += " (regra ja existia no perfil)"
         else:
-            regras.append({"match": [termo], "resposta": resp})
-            grava(PERFIL, perfil)
-            promovido = True
+            # A regra ja existente e a ultima palavra: nao sobrescreve o que o
+            # dono ja configurou a mao.
+            perfil = le_json(PERFIL, {})
+            regras = perfil.setdefault("respostas_por_palavra", [])
+            if any(termo in sem_acento(" ".join(r.get("match", [])))
+                   for r in regras):
+                motivo += " (regra ja existia no perfil)"
+            elif a.dry_run:
+                pass
+            else:
+                regras.append({"match": [termo], "resposta": resp})
+                grava(PERFIL, perfil)
+                promovido = True
 
     print(json.dumps({
         "ok": True,
+        "dry_run": a.dry_run,
         "url": url,
         "chave": chave,
+        "pergunta": a.pergunta,
         "resposta": resp,
         "substituiu": antes if antes is not None else None,
         "reutilizavel": promovel,

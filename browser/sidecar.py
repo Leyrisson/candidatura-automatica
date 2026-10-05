@@ -426,15 +426,34 @@ def _atualiza_db(message_id, origem, etapa, pagina, detalhe="", subject=""):
 
 
 _perfil = None
+_perfil_mtime = None
 
 
 def _carrega_perfil():
-    global _perfil
-    if _perfil is None:
+    """Lê o perfil.json do disco quando o mtime mudou.
+
+    Antes era cache sem prazo: o `perfil.json` era carregado uma vez e ficava
+    em memória até reiniciar o serviço. Quem escreve o arquivo é outro processo
+    (o telebot, pelo `gravar-respostas.py`, quando o dono responde uma pergunta
+    de vaga), então a regra nova que ele acabou de gravar só valia na vaga
+    seguinte, depois de um restart — que era o que a gente esquecia de fazer.
+
+    Cache por mtime: reler só quando o arquivo muda de fato."""
+    global _perfil, _perfil_mtime
+    try:
+        mtime = (BASE / "perfil.json").stat().st_mtime_ns
+    except OSError:
+        mtime = None
+    if _perfil is None or mtime != _perfil_mtime:
         try:
             _perfil = json.loads((BASE / "perfil.json").read_text(encoding="utf-8"))
+            _perfil_mtime = mtime
         except Exception:
-            _perfil = {}
+            # Arquivo momentaneamente ilegível (outro processo gravando por
+            # cima): segura o que já tinha em vez de zerar o perfil e começar a
+            # reprovar vaga por falta de regra.
+            if _perfil is None:
+                _perfil = {}
     return _perfil
 
 
