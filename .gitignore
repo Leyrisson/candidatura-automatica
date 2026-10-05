@@ -10,6 +10,12 @@ coleta-classificadas.json
 telegram-enviado.json
 *.log
 
+# Estado do fluxo de respostas pelo Telegram (04/10). Contêm o que a pessoa
+# respondeu — salário aceito, disponibilidade, pretensão — e o mapa
+# message_id -> vaga. Dado pessoal: nunca versionar.
+telegram-vagas.json
+browser/respostas-vaga.json
+
 # Perfil do navegador: cookies e sessão dos portais. NUNCA versionar.
 browser/perfil-ff/
 browser/perfil-chrome/
