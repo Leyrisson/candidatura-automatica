@@ -81,6 +81,52 @@ A ordem importa, e o motivo está em cada arquivo:
 | `db.js` | schema SQLite (`vagas`, `candidaturas`, …) |
 | `estado.js` | bandeira liga/desliga |
 | `bench-modelos.js` | mede latência dos modelos antes de trocar o padrão |
+| `resultados.js` | deduplicata uma vaga entre coletas (bridge no `estado.js`) |
+| `mandar-telegram.py` | manda 1 mensagem por vaga e grava o mapa `message_id → vaga` |
+| `gravar-respostas.py` | grava a resposta e separa o que é reaproveitável do que é só desta vaga |
+| `monitorar.py` / `relatorio.py` | radar de vagas novas e o relatório diário |
+| `browser/test_criterios_pagina.py` | testes do preenchimento (rodam sem browser) |
+| `test-coleta-criterios.js` | testes dos critérios de classificação |
+
+## Responder as perguntas pelo Telegram
+
+Vaga com questionário travava em `exige_questionario` e ninguém via. Agora o
+ciclo fecha sem sair do celular, e **a candidatura só sai depois do clique**:
+
+1. `mandar-telegram.py` manda **uma mensagem por vaga** e guarda
+   `telegram-vagas.json` com `message_id → url`. Uma por mensagem porque a
+   Catho escreve `*` nos campos obrigatórios e, num texto só, os `*` se casam
+   entre perguntas diferentes.
+2. No telebot, a mensagem vira uma sessão: ele pergunta **uma por vez**,
+   aceita `pula`, e no fim mostra tudo num resumo com os botões **Enviar** e
+   **Descartar**.
+3. `gravar-respostas.py` grava cada resposta em `browser/respostas-vaga.json`
+   e decide o destino dela:
+
+   | Tipo de resposta | Vai para |
+   |---|---|
+   | objetiva e curta (`Sim`, `Windows 11`, ` técnico`) | `perfil.json`, reaproveita nas próximas |
+   | salário, pretensão, disponibilidade | só nesta vaga |
+   | resposta aberta, texto longo, anexo, contato | só nesta vaga |
+
+   É o que evita perguntar de novo o que você já respondeu dez vezes — sem
+   learnar por accidento uma resposta que era específica daquela vaga.
+
+4. O botão **Enviar** enfileira em `fila-vagas.jsonl` e o watcher processa.
+   O telebot espera a linha aparecer em `resultado-vagas.jsonl` e só aí
+   confirma.
+
+Dois detalhes que custaram tempo:
+
+- **O sidecar lê a resposta da vaga antes do `perfil.json`.** Sem isso, uma
+  resposta dita no Telegram era sobrescrita pela regra genérica e a vaga ia
+  para `revisar` mesmo com a resposta certa gravada.
+- **`POST /vaga` não serve para candidatar.** Ele só *lê* a página e devolve o
+  texto e os links; quem preenche e envia é o watcher, lendo a fila. Integrar
+  o botão no endpoint errado dava "enviei" sem ter candidatado nada.
+
+`browser/respostas-vaga.json` e `telegram-vagas.json` são estado de execução e
+estão no `.gitignore`: contêm o que a pessoa respondeu e o mapa das mensagens.
 
 ## Instalação
 
@@ -113,8 +159,14 @@ direta, que é o fluxo atual, é autocontida.
 
 ## ⚠️ Aviso
 
-`browser/perfil.json` é um **modelo**, com valores fictícios. Preencha com os
-seus antes de rodar — ele é o que o sidecar digita nos formulários.
+`browser/perfil.json` é um **modelo**, com valores fictícios: o nome do
+candidato é `Fulano de Tal` e a faixa salarial é um exemplo. Preencha com os
+seus antes de rodar — é ele que o sidecar digita nos formulários. As skills
+(`firewall`, `kaspersky`, `acronis`…) são reais porque é o que dá utilidade
+ao arquivo.
+
+O `browser/perfil.json` também é lido em memória pelo sidecar. Se você editar
+ele com outro processo, reinicie o `vagas-sidecar` — o cache só cai no boot.
 
 Automatizar candidacyatura em portal é contra os termos de uso de vários deles.
 Use no seu ritmo, com conta própria, e em volume humano.
