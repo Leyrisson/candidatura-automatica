@@ -46,8 +46,10 @@ function jaClassificadas() {
 function marcarClassificadas(chaves) {
   const s = jaClassificadas();
   for (const k of chaves) s.add(k);
-  // Janela deslizante: não precisamos de histórico eterno, só do recente.
-  const todas = [...s].slice(-800);
+  // Janela deslizante: não precisamos de histórico eterno, só do recente. Subiu
+  // de 800 para 5000 em 2026-10-03 porque a coleta direta passou a produzir
+  // ~180 vagas por rodada (buscas nacionais) — 800 não cobria uma semana.
+  const todas = [...s].slice(-5000);
   fs.writeFileSync(VISTOS, JSON.stringify(todas), "utf8");
 }
 
@@ -142,6 +144,29 @@ async function main() {
   }));
 
   marcarClassificadas(bruto.map(chave));
+  limparPonte();
+}
+
+// O arquivo de ponte (coleta-vagas.jsonl) é escrito por coleta.py em MODO
+// APPEND e nunca era zerado: em 2026-10-03 tinha 809 linhas e cada rodada
+// relia e reparseava o arquivo inteiro — o custo crescia a cada 30 min.
+//
+// Limpar por TRUNCATE seria perda de dados se coleta.py estivesse escrevendo
+// no meio da leitura. O rename é atômico: o inode some do caminho (tudo que
+// eu já li está nele) e o append seguinte do coletor recria um arquivo novo
+// em vez de se misturar ao que estou processando.
+function limparPonte() {
+  if (!fs.existsSync(COLETA)) return;
+  try {
+    const tmp = `${COLETA}.lido`;
+    fs.renameSync(COLETA, tmp);
+    fs.writeFileSync(COLETA, "", "utf8");
+    const n = linhas(tmp).length;
+    fs.unlinkSync(tmp);
+    console.log(JSON.stringify({ ponte_lida: n, ponte_esvaziada: true }));
+  } catch (e) {
+    console.error("coleta: nao consegui limpar a ponte:", e.message);
+  }
 }
 
 main().then(() => process.exit(0)).catch((e) => {

@@ -221,23 +221,29 @@ async function classificar(conteudo, assunto, opts) {
   // nas áreas da lista. Recusa óbvia (nem local, nem TI) NÃO vai ao LLM.
   const duvidoso = (!localOk && PISTA_LOCAL.test(texto)) || (!h.ehArea && PARECE_TI.test(texto));
   if (!duvidoso || !ehVaga) {
-    const motivo = !ehVaga ? "e-mail sem sinal de vaga (newsletter/convite/aviso)"
-      : !localOk ? "local fora de SP/Sorocaba/remoto"
-      : !h.ehArea ? "area fora das áreas de TI pedidas"
-      : h.regimeRuim ? `regime incompativel no e-mail (${h.regime})`
-      : h.exigeSuperior && h.exigeCert ? "exige ensino superior e certificacao"
-      : h.exigeSuperior ? "exige ensino superior"
-      : h.exigeCert ? "exige certificacao"
-      : "local e area ok; regime sera conferido na pagina da vaga";
-    return {
-      local: h.ehRemoto ? "Remoto" : h.ehSP ? "SP" : "",
-      regime: h.regime,
-      areas,
-      exigencia: h.exigeSuperior && h.exigeCert ? "ambas" : h.exigeSuperior ? "superior" : h.exigeCert ? "certificacao" : "nenhuma",
-      aprovado: ehVaga && localOk && h.ehArea && !h.regimeRuim && !h.exigeSuperior && !h.exigeCert,
-      motivo: `heuristica (${motivo})`,
-      fonte: "heuristica",
-    };
+// 2026-10-03, regra do dono: a falta de ensino superior/certificação
+      // NÃO reprova aqui. A decisão é do FORMULÁRIO (campo obrigatório), no
+      // sidecar (`_campo_formacao_obrigatorio`), porque menção no card é
+      // boilerplate: a maioria dos cards do InfoJobs traz "Ensino Superior" na
+      // listagem sem que o formulário cobre o campo. Reprovar aqui descartava
+      // ~13% do volume (24 de 179 cards na medição) por um requisito que
+      // ninguém pergunta. A informação continua sendo enviada adiante, em
+      // `exigencia`, para o sidecar conferir no formulário.
+      const motivo = !ehVaga ? "e-mail sem sinal de vaga (newsletter/convite/aviso)"
+        : !localOk ? "local fora de SP/Sorocaba/remoto"
+        : !h.ehArea ? "area fora das áreas de TI pedidas"
+        : h.regimeRuim ? `regime incompativel no e-mail (${h.regime})`
+        : h.exigeSuperior || h.exigeCert ? "exige ensino superior/certificacao (conferir no formulario)"
+        : "local e area ok; regime sera conferido na pagina da vaga";
+      return {
+        local: h.ehRemoto ? "Remoto" : h.ehSP ? "SP" : "",
+        regime: h.regimeRuim ? "incompativel" : (h.ehCLT ? "CLT" : "?"),
+        areas,
+        exigencia: h.exigeSuperior && h.exigeCert ? "ambas" : h.exigeSuperior ? "superior" : h.exigeCert ? "certificacao" : "nenhuma",
+        aprovado: ehVaga && localOk && h.ehArea && !h.regimeRuim,
+        motivo: `heuristica (${motivo})`,
+        fonte: "heuristica",
+      };
   }
 
   // Lote grande (coleta direta) desliga o desempate: com 120s de timeout por

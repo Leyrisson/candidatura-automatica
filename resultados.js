@@ -25,24 +25,37 @@ function lerResultados(caminho) {
   return saida;
 }
 
-// Identidade da candidatura: messageId + URL. Um digest de e-mail pode trazer
-// mais de uma vaga, e elas entram na fila com o mesmo messageId e URLs
-// diferentes — chedar só por messageId (como o watcher fazia) ignorava a 2ª.
+// Identidade da candidatura: a URL quando ela existe, o messageId só como
+// reserva para resultado antigo sem url.
+//
+// A chave era `messageId + URL` composta (o par tinha que bater junto) e isso
+// reprocessava vaga já resolvida sempre que o messageId mudava. Foi o que
+// duplicou a 37382446 da Catho: a rodada manual gravou `rod2-05`, a coleta
+// gravou `coleta:catho:37382446`, mesma URL, e o par nunca casou — a vaga foi
+// lida e processada duas vezes.
+//
+// Por que a URL manda: ela é a identidade ESTÁVEL da vaga (o coletor a
+// reconstrói do card), então reencontrar a mesma URL é reencontrar a mesma
+// vaga, mesmo com messageId novo. E casar por messageId não pode ser o padrão
+// porque um digest de e-mail traz VÁRIAS vagas com o mesmo messageId — aí a 2ª
+// seria dada como resolvida e ignorada.
 function indexResultados(caminho) {
-  const porChave = new Set();
-  const semUrl = new Set();
+  const mids = new Set();
+  const urls = new Set();
   for (const r of lerResultados(caminho)) {
     const mid = String(r.messageId || "");
-    if (!mid) continue;
+    if (mid) mids.add(mid);
     const u = norm(r.url);
-    if (u) porChave.add(`${mid}|${u}`);
-    else semUrl.add(mid);
+    if (u) urls.add(u);
   }
   return {
-    // Resultado antigo sem url gravada: não dá para saber qual vaga era, então
-    // trata o messageId inteiro como já resolvido (evita candidatura duplicada).
-    visto: (messageId, url) => semUrl.has(messageId)
-      || porChave.has(`${messageId}|${norm(url)}`),
+    visto: (messageId, url) => {
+      const u = norm(url);
+      // Resultado antigo sem url: não dá para saber qual vaga era, então trata o
+      // messageId inteiro como resolvido (evita candidatura duplicada).
+      if (!u) return mids.has(String(messageId || ""));
+      return urls.has(u);
+    },
   };
 }
 

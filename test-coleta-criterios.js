@@ -22,9 +22,23 @@ const { classificar } = require("./classifica.js");
       () => classificar("Operador de Logistica 25 set 4,2 GRUPO SUPORTE Cabreuva - SP "
         + "Ensino Fundamental Presencial", "Operador de Logística",
       { areaTexto: "Operador de Logística", deFim: true }), false],
-    ["card de portal, exige ensino superior (deve recusar)",
+    // REGRA MUDOU em 2026-10-03: menção a ensino superior no CARD não reprova
+    // mais. O dono não tem superior nem certificação, mas a recusa passou a ser
+    // do FORMULÁRIO (campo obrigatório), conferido pelo sidecar em
+    // `_campo_formacao_obrigatorio`. Motivo: "Ensino Superior" no card é
+    // boilerplate — a vaga segue para a conferência do formulário. O `exigencia`
+    // continua sendo enviado adiante para essa conferência.
+    ["card de portal cita ensino superior (deve seguir p/ conferir no formulario)",
       () => classificar("Analista de Infraestrutura de TI JR Sao Paulo Ensino Superior "
         + "Presencial CLT", "Analista de Infraestrutura De TI JR",
+      { areaTexto: "Analista De Infraestrutura De TI JR", deFim: true }), true],
+    ["card de portal cita superior mas o requisito nao e de formacao (deve aprovar)",
+      () => classificar("Analista de Suporte Sao Paulo exige disponibilidade para "
+        + "trabalhar presencial CLT", "Analista de Suporte",
+      { areaTexto: "Analista de Suporte", deFim: true }), true],
+    ["card de portal, PJ (deve recusar mesmo com mencao a superior)",
+      () => classificar("Analista de Infraestrutura Sao Paulo Ensino Superior "
+        + "contratacao como PJ", "Analista De Infraestrutura De TI JR",
       { areaTexto: "Analista De Infraestrutura De TI JR", deFim: true }), false],
     ["card de portal, fora de SP e nao remoto (deve recusar)",
       () => classificar("Analista de Suporte Recife - PE A combinar Ensino Tecnico "
