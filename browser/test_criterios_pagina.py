@@ -17,8 +17,14 @@ CASOS = [
     ("temporaria", "Vaga temporária, 6 meses.", False, "incompativel"),
     ("estagio", "Estágio em TI.", False, "incompativel"),
     ("aprendiz", "Vaga de aprendiz.", False, "incompativel"),
-    ("exige superior", "Exige ensino superior completo.", False, ""),
-    ("exige ccna", "Certificação CCNA é obrigatória.", False, ""),
+    # "exige superior" e "exige ccna": desde 2026-10-03 menção a exigência na
+    # DESCRIÇÃO não reprova a vaga — a recusa é decidida pelo campo obrigatório
+    # do formulário (`_campo_formacao_obrigatorio`), porque a maioria dos cards
+    # do InfoJobs lista "Ensino Superior" como boilerplate sem que o formulário
+    # cobre aquilo. Aqui não há regime nenhum na página, então o retorno é
+    # ok=False com regime="?" (revisar). O esperado era "" — de antes da regra.
+    ("exige superior", "Exige ensino superior completo.", False, "?"),
+    ("exige ccna", "Certificação CCNA é obrigatória.", False, "?"),
     ("sem mencao a regime", "Vaga de Analista de Ti em São Paulo. Requisitos: experiência.", False, "?"),
     ("nega clt", "Não é CLT, contratação PJ.", False, "incompativel"),
     ("diferencial nao reprova", "Contratação CLT. Conhecimento em CCNA é diferencial.", True, "CLT"),

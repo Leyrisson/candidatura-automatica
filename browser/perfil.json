@@ -1,15 +1,250 @@
 {
-  "faixa_salarial": "R$ 3.000,00 - R$ 11.000,00",
+  "faixa_salarial": "R$ 4.000,00 - R$ 9.000,00",
   "respostas_por_palavra": [
-    { "match": ["acesso a regi", "facil acesso"], "resposta": "Sim" },
-    { "match": ["100% presencial", "maneira presencial", "presencial"], "resposta": "Sim" },
-    { "match": ["atendimento ao cliente"], "resposta": "Sim" },
-    { "match": ["telefone e chat", "via telefone"], "resposta": "Sim" },
-    { "match": ["faixa salarial"], "resposta": "R$ 3.000,00 - R$ 11.000,00" },
-    { "match": ["disponibilidade para trabalhar presencial"], "resposta": "Sim" },
-    { "match": ["experiência em suporte", "experiência em ti", "conhecimento em informática"], "resposta": "Sim" },
-    { "match": ["windows 10", "windows 11", "windows 10/11", "sistema operacional windows"], "resposta": "Sim" },
-    { "match": ["formatação", "manutenção e upgrade de computadores", "upgrade de computadores", "manutenção de computadores"], "resposta": "Sim" },
-    { "match": ["remuneração atual", "salário atual", "salario atual", "remuneração atual ou última"], "resposta": "R$ 0.000,00" }
+    {
+      "match": [
+        "acesso a regi",
+        "facil acesso"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "100% presencial",
+        "maneira presencial",
+        "presencial"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "atendimento ao cliente"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "telefone e chat",
+        "via telefone"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "faixa salarial"
+      ],
+      "resposta": "R$ 4.000,00 - R$ 9.000,00"
+    },
+    {
+      "match": [
+        "disponibilidade para trabalhar presencial"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "experiência em suporte",
+        "experiência em ti",
+        "conhecimento em informática"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "windows 10",
+        "windows 11",
+        "windows 10/11",
+        "sistema operacional windows"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "formatação",
+        "manutenção e upgrade de computadores",
+        "upgrade de computadores",
+        "manutenção de computadores"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "remuneração atual",
+        "salário atual",
+        "salario atual",
+        "remuneração atual ou última"
+      ],
+      "resposta": "R$ 0.000,00"
+    },
+    {
+      "match": [
+        "nome completo",
+        "seu nome",
+        "informe seu nome",
+        "nome do candidato",
+        "nome e sobrenome"
+      ],
+      "resposta": "Fulano de Tal"
+    },
+    {
+      "match": [
+        "área de atuação",
+        "area de atuacao",
+        "área de interesse",
+        "área profissional",
+        "cargo desejado",
+        "posição desejada",
+        "posicao desejada"
+      ],
+      "resposta": "Infraestrutura de TI e Suporte"
+    },
+    {
+      "match": [
+        "anos de experiência",
+        "tempo de experiência",
+        "quanto tempo de experiência",
+        "experiência profissional",
+        "experiencia profissional",
+        "quantos anos",
+        "há quantos anos",
+        "ha quantos anos",
+        "anos de ti",
+        "anos em ti",
+        "tempo na área",
+        "tempo na area",
+        "experiência na área",
+        "experiencia na area",
+        "experiência em ti",
+        "experiencia em ti"
+      ],
+      "resposta": "Mais de 10 anos em TI"
+    },
+    {
+      "match": [
+        "aceita trabalho remoto",
+        "disponível para remoto",
+        "disponivel para remoto",
+        "home office",
+        "trabalho remoto",
+        "100% remoto"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "experiência com firewall",
+        "experiencia com firewall",
+        "conhecimento em firewall",
+        "fortigate",
+        "fortinet",
+        "firewall"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "experiência com vpn",
+        "experiencia com vpn",
+        "conhecimento em vpn",
+        "vpn"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "experiência com redes",
+        "experiencia com redes",
+        "conhecimento em redes",
+        "rede de computação",
+        "trabalha com redes"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "experiência com linux",
+        "experiencia com linux",
+        "conhecimento em linux",
+        "linux"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "azure",
+        "nuvem",
+        "cloud",
+        "intune",
+        "mdm",
+        "endpoint"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "kaspersky",
+        "sentinelone",
+        "edr",
+        "antivírus",
+        "antivirus",
+        "segurança da informação",
+        "lgpd",
+        "zerotrust",
+        "zero trust"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "acronis",
+        "backup",
+        "recuperação de desastre",
+        "recuperacao de desastre",
+        "disco de rede",
+        "nas"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "sap",
+        "erp"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "telefonia",
+        "voip",
+        "avaya"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "n2",
+        "n3",
+        "segundo nível",
+        "terceiro nível",
+        "sla",
+        "chamado"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "soc",
+        "monitoramento de segurança",
+        "centro de operações de segurança",
+        "siem"
+      ],
+      "resposta": "Sim"
+    },
+    {
+      "match": [
+        "pcd"
+      ],
+      "resposta": "Não"
+    }
   ]
 }

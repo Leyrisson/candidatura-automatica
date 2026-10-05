@@ -19,9 +19,11 @@ import sqlite3
 import sys
 import threading
 import time
+import unicodedata
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urljoin
 
 HOST = os.environ.get("VAGAS_SIDE_HOST", "0.0.0.0")
 PORT = int(os.environ.get("VAGAS_SIDE_PORT", "8788"))
@@ -112,7 +114,8 @@ REGIME_NA_PAGINA_RUIM = re.compile(
 )
 EXIGENCIA_NA_PAGINA = re.compile(
     r"(exig|requer|necess[áa]ri|obrigat[óo]ri|comprov)[a-zçãáéíóúâêô]{0,3}\s*"
-    r"(o\s+|a\s+)?(ensino\s+superior|curso\s+superior|gradua[çc][ãa]o|bacharel|"
+    r"(o\s+|a\s+)?(ensino\s+superior|curso\s+superior|forma[çc][ãa]o\s+superior|"
+    r"gradua[çc][ãa]o|bacharel|"
     r"licenciatura|tecn[óo]logo|ensino\s+t[ée]cnico)|"
     # certificação exigida: exige o verbo E o nome da certificação. "Conhecimento
     # em CCNA" (sem verbo de exigência) é diferencial, não requisito — por isso
@@ -122,7 +125,8 @@ EXIGENCIA_NA_PAGINA = re.compile(
     r"itil|pmp|aws\s+certified|azure\s+(fundamentals|administrator|developer))|"
     # verbo DEPOIS do nome: "Certificação Microsoft é obrigatória", "Diploma de
     # graduação necessário". `[^.]{0,40}` impede atravessar a frase seguinte.
-    r"(certifica\w*|certificado|diploma|curso)\s+[^.]{0,40}?"
+    r"(certifica\w*|certificado|diploma|curso|forma[çc][ãa]o|n[íi]vel\s+de\s+escolaridade)"
+    r"\s+[^.]{0,40}?"
     r"(obrigat[óo]ri[oa]?|indispens[áa]vel|necess[áa]ri[oa]|exig[íi]d[oa]?|"
     r"[ée]\s+(obrigat[óo]ri[oa]|necess[áa]ri[oa]))|"
     r"(ensino\s+superior|curso\s+superior|gradua[çc][ãa]o)\s+(completo|conclu[íi]do|obrigat)",
@@ -173,15 +177,28 @@ def confere_criterios_pagina(texto):
                 "regime": "incompativel", "exigencia": ""}
     limpo = NEGACAO_EXIGENCIA.sub(" ", t)
     m_exi = EXIGENCIA_NA_PAGINA.search(limpo)
+    # 2026-10-03, regra do dono: ele não tem ensino superior NEM certificação,
+    # mas a recusa passou a ser decidida pelo FORMULÁRIO (campo obrigatório),
+    # em `_campo_formacao_obrigatorio` — não pela descrição. Menção na
+    # descrição é o caso comum: a maioria dos cards do InfoJobs lista "Ensino
+    # Superior" como boilerplate sem que o formulário cobre isso, e reprovar
+    # aqui descartava vaga por um requisito que ninguém pergunta.
+    # De quebra corrige um rótulo errado: antes, TODO match de exigência era
+    # gravado como "superior", inclusive os de certificação.
+    exigencia_mencionada = ""
     if m_exi:
-        return {"ok": False, "motivo": f"exigencia na pagina ({m_exi.group(0).strip()[:60]})",
-                "regime": "", "exigencia": "superior"}
+        s = m_exi.group(0).lower()
+        exigencia_mencionada = (
+            "certificacao" if re.search(r"certifica|ccna|comptia|cissp|itil|pmp", s)
+            else "superior")
     limpo_reg = REGIME_CLT_NAO_CONFIRMA.sub(" ", t)
     m_clt = REGIME_CLT_NA_PAGINA.search(limpo_reg)
     if m_clt:
-        return {"ok": True, "motivo": "", "regime": "CLT", "exigencia": ""}
+        return {"ok": True, "motivo": "", "regime": "CLT", "exigencia": "",
+                "exigencia_mencionada": exigencia_mencionada}
     return {"ok": False, "motivo": "regime nao confirmado na pagina (revisar antes de candidatar)",
-            "regime": "?", "exigencia": "", "revisar": True}
+            "regime": "?", "exigencia": "", "revisar": True,
+            "exigencia_mencionada": exigencia_mencionada}
 
 # Requisições concorrentes subindo browser no MESMO perfil quebram o launch.
 # Serializa /vaga, /sessao e /logoff.
@@ -229,7 +246,9 @@ def html_para_texto(html):
     return t.strip()
 
 
-def tratar_vaga(page):
+def tratar_vaga(page, url=None):
+    """`url` e a vaga em que estamos; sem ela (chamada antiga) as
+    respostas por vaga simplesmente nao sao usadas."""
     try:
         page.wait_for_load_state("domcontentloaded", timeout=30000)
     except Exception:
@@ -272,10 +291,10 @@ def abrir(url):
                 page.goto(url, wait_until="domcontentloaded", timeout=45000)
             except Exception as e:
                 resp = {"erro": str(e)}
-                resp.update(tratar_vaga(page))
+                resp.update(tratar_vaga(page, url))
                 ctx.close()
                 return resp
-            resp = tratar_vaga(page)
+            resp = tratar_vaga(page, url)
             ctx.close()
             return resp
 
@@ -426,15 +445,96 @@ def _texto_visivel(page):
         return ""
 
 
-def _resposta_para_pergunta(pergunta):
-    """Resposta de perfil para uma pergunta do questionário (ou None se fora do perfil)."""
-    q = re.sub(r"[^a-z0-9 ]", " ", pergunta.lower())
-    for regra in _carrega_perfil().get("respostas_por_palavra", []):
-        if any(p in q for p in regra.get("match", [])):
+def _respostas_da_vaga(url):
+    """Respostas que o dono deu no Telegram para ESTA vaga.
+
+    Fica separado do `perfil.json` de propósito: o perfil responde o que vale
+    sempre ("aceita até R$ 2.000", "mora no Tatuapé"), e aqui mora o que só
+    faz sentido naquela vaga ("conte a situação em que você cortou custo...").
+    Sem essa separação, a primeira resposta livre viraria regra permanente e a
+    próxima vaga levaria o texto errado.
+    """
+    if not url:
+        return {}
+    chave = str(url).split("?")[0]
+    try:
+        todo = json.loads((BASE / "respostas-vaga.json").read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return todo.get(chave) or {}
+
+
+def _sem_acento(texto):
+    """minúsculo, sem acento, só letras/números/espaço.
+
+    Bug corrigido em 2026-10-03: a normalização era `re.sub(r"[^a-z0-9 ]", " ")`
+    SÓ na pergunta. Os padrões do `perfil.json` estão escritos com acento, e
+    acento não é [a-z0-9] — virava ESPAÇO, partindo a palavra: "remuneração
+    atual" virava "remuner a o atual" e nunca casava com a pergunta da Catho
+    ("Qual sua remuneração atual ou última?"). Ou seja, a regra de salário
+    estava no perfil mas MORTA, e a vaga travava em `exige_questionario`
+    perguntando o salário que o próprio perfil já respondia. Agora os dois lados
+    passam pela mesma normalização.
+    """
+    s = unicodedata.normalize("NFKD", str(texto).lower())
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    # Colapsa espacos e tira o das pontas. Sem isso a chave da resposta
+    # guardada por vaga fica "r  2 000 00 " (espaco duplo, sobra), e o
+    # sidecar reextrai a pergunta do portal no momento de aplicar: qualquer
+    # diferenca de pontuacao/espalhamento entre a coleta e a aplicacao
+    # faria a resposta dada no Telegram nao casar e a vaga travar de novo.
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _resposta_para_pergunta(pergunta, url=None):
+    """Resposta para uma pergunta: primeiro a da vaga, depois a do perfil.
+
+    A da vaga tem precedência porque foi o dono respondendo naquele texto exato,
+    naquele contexto; a do perfil é regra genérica e serve de reserva.
+    """
+    q = _sem_acento(pergunta)
+    dada = _respostas_da_vaga(url).get(q)
+    if dada is not None and str(dada).strip():
+        return dada
+    perfil = _carrega_perfil()
+    for regra in perfil.get("respostas_por_palavra", []):
+        # o padrão também é normalizado: "remuneração atual" e "remuneracao
+        # atual" têm que casar igual.
+        if any(_sem_acento(p).strip() in q for p in regra.get("match", [])):
             return regra.get("resposta", "")
-    faixa = _carrega_perfil().get("faixa_salarial")
+    faixa = perfil.get("faixa_salarial")
     if faixa and "salarial" in pergunta.lower():
         return faixa
+    return None
+
+
+# Pergunta de formação no questionário TEXTUAL (InfoJobs usa `KillerQuestion*`,
+# um textarea por pergunta). Não entra "formação" genérica de propósito: "Você
+# tem formação em TI?" não é exigência de superior e não pode reprovar.
+RE_FORMACAO_PERGUNTA = re.compile(
+    r"(ensino\s+superior|superior\s+completo|curso\s+superior|gradua[çc][ãa]o|"
+    r"licenciatura|bacharel|tecn[óo]logo|p[óo]s[-\s]gradua)", re.I)
+RE_CERTIFICACAO_PERGUNTA = re.compile(
+    r"(certifica\w*|certificado|ccna|comptia|cissp|itil|pmp|"
+    r"aws\s+certified|azure\s+(fundamentals|administrator|developer))", re.I)
+
+
+def _classifica_pergunta_formacao(perguntas):
+    """Se o questionário tem pergunta de superior/certificação, devolve qual.
+
+    Regra do dono (2026-10-03): ele não tem nenhum dos dois, então uma vaga que
+    pergunte isso é DESCARTADA. Antes disso a vaga ficava parada em
+    `exige_questionario` esperando resposta do dono — que é o comportamento que
+    ele pediu para acabar (a vaga "Analista de Suporte TI Jr" da Catho ficou
+    exatamente assim desde 25/09).
+    """
+    for q in perguntas or []:
+        if RE_CERTIFICACAO_PERGUNTA.search(q or ""):
+            return "certificacao"
+    for q in perguntas or []:
+        if RE_FORMACAO_PERGUNTA.search(q or ""):
+            return "superior"
     return None
 
 
@@ -456,7 +556,7 @@ def _extrai_perguntas(texto):
     return perguntas[:5]
 
 
-def _infofjobs_avanca(page):
+def _infofjobs_avanca(page, url=None):
     """Clique no 'Candidatar-me' e conclui o questionário quando as perguntas
     forem respondíveis pelo perfil.json (regra: parar e perguntar se faltar).
 
@@ -498,12 +598,17 @@ def _infofjobs_avanca(page):
                         campos.append(fld)
                 except Exception:
                     continue
+            formacao = _classifica_pergunta_formacao(perguntas)
+            if formacao:
+                return {"etapa": "exige_certificacao" if formacao == "certificacao"
+                                  else "exige_superior",
+                        "perguntas": [q for q in perguntas if q.strip()]}
             respostas = []
             faltando = []
             for q in perguntas:
                 if not q.strip():
                     continue
-                ans = _resposta_para_pergunta(q)
+                ans = _resposta_para_pergunta(q, url)
                 if ans is None:
                     faltando.append(q)
                 else:
@@ -542,6 +647,58 @@ def _campos_visiveis(page):
         except Exception:
             continue
     return out
+
+
+# Regra do dono, 2026-10-03: ele NÃO tem ensino superior NEM certificação. A
+# decisão passou a ser tomada pelo FORMULÁRIO, não pela descrição da vaga:
+#   - form com campo OBRIGATÓRIO de superior/certificação -> descarta a vaga;
+#   - vaga que só MENCIONA "ensino superior" no texto, sem campo obrigatório
+#     -> NÃO descarta (a maioria dos cards do InfoJobs lista "Ensino Superior"
+#     como boilerplate sem que o formulário cobre isso).
+# Por isso isto olha `select`/radio/checkbox também — a maioria dos formulários
+# de formação é select ("Nível de escolaridade") ou radio, e o
+# `_campos_visiveis` (só input de texto) nunca enxergava esses.
+JS_CAMPOS_FORMACAO = """() => {
+  const sobre = /(superior|gradu|licenciatura|bacharel|tecn[óo]logo|diploma|n[íi]vel\\s+de\\s+escolaridade|formacao|certifica|ccna|comptia|cissp|itil|pmp)/i;
+  const cert = /(certifica|ccna|comptia|cissp|itil|pmp|aws\\s+certified|azure\\s+(fundamentals|administrator))/i;
+  const out = [];
+  for (const el of document.querySelectorAll(
+      'select, input[type=radio], input[type=checkbox], textarea, input[type=text]')) {
+    if (!el.getClientRects().length) continue;            // invisível/oculto
+    let r = '';
+    try { const l = el.closest('label'); if (l) r += ' ' + (l.innerText || ''); } catch (e) {}
+    for (const a of ['aria-label', 'placeholder', 'name', 'id']) {
+      const v = el.getAttribute ? el.getAttribute(a) : null;
+      if (v) r += ' ' + v;
+    }
+    try {
+      const g = el.closest('.form-group, fieldset, .field, .row, div');
+      if (g) r += ' ' + (g.innerText || '').slice(0, 160);
+    } catch (e) {}
+    r = r.replace(/\\s+/g, ' ').trim();
+    if (!sobre.test(r)) continue;
+    const obrigatorio = !!el.required
+      || el.getAttribute('aria-required') === 'true'
+      || el.getAttribute('data-required') === 'true'
+      || /\\*/.test(r);
+    out.push({tag: el.tagName, type: el.type || '', rotulo: r.slice(0, 140),
+              obrigatorio: obrigatorio, certificacao: cert.test(r)});
+  }
+  return out;
+}"""
+
+
+def _campo_formacao_obrigatorio(page):
+    """Devolve "certificacao"/"superior" se houver campo OBRIGATÓRIO de formação
+    no formulário, senão None. Nada é preenchido aqui: a vaga é descartada."""
+    try:
+        achados = page.evaluate(JS_CAMPOS_FORMACAO)
+    except Exception:
+        return None
+    for a in achados or []:
+        if a.get("obrigatorio"):
+            return "certificacao" if a.get("certificacao") else "superior"
+    return None
 
 
 def _label_do_campo(fld):
@@ -593,14 +750,14 @@ def _clica_por_texto(page, alvos, espera=2000):
     return False
 
 
-def _avanca_candidatura(page, portal):
+def _avanca_candidatura(page, portal, url=None):
     """Fluxo genérico de candidatura extra-InfoJobs (catho/vagas/gupy).
 
     Clica no botão de candidatar-se, responde campos de texto cuja pergunta
     bater no perfil, clica em enviar/concluir e confirma pelo texto visível.
     Regra: pergunta fora do perfil → exige_questionario (para e pergunta)."""
     if portal == "infojobs":
-        return _infofjobs_avanca(page)
+        return _infofjobs_avanca(page, url)
     if re.search(r"cv (foi )?enviado|candidatura enviada", _texto_visivel(page), re.I):
         return {"etapa": "candidatado", "perguntas": []}
     if portal in ("vagas",) and re.search(
@@ -623,11 +780,20 @@ def _avanca_candidatura(page, portal):
         if re.search(MARCADORES_JA_CANDIDATADO, texto, re.I):
             return {"etapa": "ja_candidatado", "perguntas": []}
         campos = _campos_visiveis(page)
+        # Regra do dono (2026-10-03): campo OBRIGATÓRIO de superior/certificação
+        # descarta a vaga — ele não tem nenhum dos dois. Só isso: menção na
+        # descrição não descarta, porque a maioria dos cards do InfoJobs lista
+        # "Ensino Superior" como boilerplate sem cobrar isso no formulário.
+        formacao = _campo_formacao_obrigatorio(page)
+        if formacao:
+            return {"etapa": "exige_certificacao" if formacao == "certificacao"
+                              else "exige_superior",
+                    "perguntas": []}
         if campos:
             fills, faltando = {}, []
             for fld in campos[:6]:
                 q = _label_do_campo(fld)
-                ans = _resposta_para_pergunta(q) if q else None
+                ans = _resposta_para_pergunta(q, url) if q else None
                 if ans:
                     fills[fld] = ans
                 elif q:
@@ -687,7 +853,7 @@ def _candidar_portal(portal, url):
             elif re.search(MARCADORES_JA_CANDIDATADO, texto, flags=re.I):
                 estado, perguntas = "ja_candidatado", []
             else:
-                res = _avanca_candidatura(page, portal)
+                res = _avanca_candidatura(page, portal, url)
                 estado = res.get("etapa", "")
                 perguntas = res.get("perguntas") or []
             try:
@@ -713,7 +879,7 @@ def _processa_vaga(url, msg, id_vaga, subject):
                 page.goto(url, wait_until="domcontentloaded", timeout=45000)
             except Exception as e:
                 erro = f"{type(e).__name__}: {e}"
-            pg = tratar_vaga(page)
+            pg = tratar_vaga(page, url)
             texto = pg.get("texto", "")
             texto_vis = _texto_visivel(page)
             links_txt = " ".join(l.get("texto", "") for l in pg.get("links", []))
@@ -727,11 +893,28 @@ def _processa_vaga(url, msg, id_vaga, subject):
     enviado = False
     detalhe = ""
     perguntas = []
+    link_candidatura = ""
     if portal == "vagas" and re.search(r"tenho interesse (nessa|nesta) vaga",
                                        texto_vis, flags=re.I):
+        # Medido em 2026-10-03: o botão NÃO vai para o site da empresa (o que eu
+        # tinha escrito aqui e era errado). Ele é interno e leva para
+        # /servicos/curriculo/chat — um CHAT DE IA que lê o currículo e faz a
+        # triagem. Não existe formulário nem botão de envio determinístico, então
+        # a candidatura fica com o dono, que precisa ler a resposta da IA.
+        #
+        # E tem um risco real: esse chatroom escreve que o currículo "consta
+        # formação superior em andamento", o que é FALSO (o currículo só tem
+        # Ensino Técnico — Desenhista Copista). Automatizar aqui significaria o
+        # projeto afirmar uma qualificação que o dono não tem, por conta de uma
+        # inferência da IA. Por isso fica manual.
         etapa = "externa"
         tem_botao = False
-        detalhe = "vaga externa (vai p/ site da empresa)"
+        detalhe = ("vaga externa: o Vagas.com manda para um chat de triagem por "
+                   "IA (nao ha formulario); candidatura manual")
+        for l in pg.get("links", []):
+            if "tenho-interesse" in (l.get("href") or ""):
+                link_candidatura = urljoin(pg.get("url", url), l["href"])
+                break
     elif re.search(MARCADORES_FECHADA, texto_vis, flags=re.I):
         etapa = "encerrada"
         tem_botao = False
@@ -787,6 +970,7 @@ def _processa_vaga(url, msg, id_vaga, subject):
         "perguntas": perguntas,
         "erro": erro,
         "detalhe": detalhe,
+        "linkCandidatura": link_candidatura,
         "ts": _agora_iso(),
     }
     if not erro:
@@ -829,7 +1013,7 @@ def _candidata_infojobs(url):
                 estado = "ja_candidatado"
                 perguntas = []
             else:
-                res = _infofjobs_avanca(page)
+                res = _infofjobs_avanca(page, url)
                 estado = res.get("etapa", "")
                 perguntas = res.get("perguntas") or []
             try:
