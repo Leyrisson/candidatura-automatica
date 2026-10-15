@@ -19,7 +19,20 @@ cd "$BASE" || exit 1
   # Sem LLM no lote: a heurística é a primária e o desempate por LLM (120s de
   # timeout por vaga) transformaria 80 vagas em horas de espera.
   VAGAS_HEADLESS=1 "$VENV/bin/python" "$BASE/browser/coleta.py"
-  VAGAS_SEM_LLM=1 node "$BASE/coleta.js"
+  rc_py=$?
+  rc_js=99
+  if [ "$rc_py" -eq 0 ]; then
+    VAGAS_SEM_LLM=1 node "$BASE/coleta.js"
+    rc_js=$?
+  fi
+  # Batimento cardíaco: só o SUCESSO conta. É o que permite ao vigia
+  # (vagas-saude.timer) perceber quando a coleta para — foi assim que ela ficou
+  # 8 dias quebrada em silêncio (2026-10-14).
+  if [ "$rc_py" -eq 0 ] && [ "$rc_js" -eq 0 ]; then
+    "$VENV/bin/python" "$BASE/saude.py" ok coleta
+  else
+    "$VENV/bin/python" "$BASE/saude.py" falha coleta "coleta.py=$rc_py coleta.js=$rc_js"
+  fi
 } >> "$LOG" 2>&1
 
 # O log vira Infinite-scroll: corta mantendo as últimas 400 linhas.

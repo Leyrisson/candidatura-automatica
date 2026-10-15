@@ -10,6 +10,12 @@ coleta-classificadas.json
 telegram-enviado.json
 *.log
 
+# Estado de execução: batimento cardíaco do vigia (saude.py) e monitoramento
+# das vagas já candidatadas. Timestamps e URLs de vaga, não vão ao ar.
+saude.json
+monitoramento.json
+monitoramento-relatorio.md
+
 # Estado do fluxo de respostas pelo Telegram (04/10). Contêm o que a pessoa
 # respondeu — salário aceito, disponibilidade, pretensão — e o mapa
 # message_id -> vaga. Dado pessoal: nunca versionar.
